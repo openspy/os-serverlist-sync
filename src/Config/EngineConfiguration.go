@@ -136,9 +136,13 @@ func (b *EngineConfiguration) UnmarshalJSON(data []byte) error {
 	case "OSRedisOutput":
 		b.QueryOutputHandler = &OpenSpy.OpenSpyRedisOutputHandler{}
 	}
-	b.QueryOutputHandler.SetParams(typ.OutputEngine.Params)
+
+	if b.QueryOutputHandler != nil {
+		b.QueryOutputHandler.SetParams(typ.OutputEngine.Params)
+	}
 
 	b.ServerListEngine.SetQueryEngine(b.QueryEngine)
+
 	b.QueryEngine.SetOutputHandler(b.QueryOutputHandler)
 
 	return nil

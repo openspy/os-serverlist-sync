@@ -76,8 +76,6 @@ func (se *UTMSServerListEngine) think() {
 }
 
 func (se *UTMSServerListEngine) readMessage() {
-	defer se.connection.Close()
-
 	se.readChallenge()
 
 	se.readValidation()
@@ -155,8 +153,6 @@ func (se *UTMSServerListEngine) readListResponse() {
 
 		var addr = netip.AddrPortFrom(serverIP, serverPort)
 		se.queryEngine.Query(addr)
-
-		break
 	}
 }
 

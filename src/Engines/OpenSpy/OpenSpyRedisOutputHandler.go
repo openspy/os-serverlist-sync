@@ -17,7 +17,7 @@ type OpenSpyRedisOutputHandlerParams struct {
 }
 
 const (
-	SERVER_EXPIRE_TIME_SECS int = 420
+	SERVER_EXPIRE_TIME_SECS int = 900
 )
 
 type OpenSpyRedisOutputHandler struct {
@@ -38,13 +38,13 @@ func (oh *OpenSpyRedisOutputHandler) OnServerInfoResponse(sourceAddress net.Addr
 
 	var udpAddr *net.UDPAddr = sourceAddress.(*net.UDPAddr)
 
-	fmt.Printf("Num keys: %d (%s) (%s)\n", len(serverProperties), sourceAddress.String(), fmt.Sprintf("%d", udpAddr.Port))
-
 	var server_key = oh.getServerKey(udpAddr)
 
 	if server_key == nil { //this was not an injected server?? just ignore
 		return
 	}
+
+	fmt.Printf("Num keys (%s): %d (%s) (%s)\n", *server_key, len(serverProperties), sourceAddress.String(), fmt.Sprintf("%d", udpAddr.Port))
 
 	//setup standard keys
 	oh.redisClient.HSet(oh.context, *server_key, []string{
