@@ -7,6 +7,7 @@ import (
 	"os-serverlist-sync/Engines"
 	"os-serverlist-sync/Engines/GOA"
 	"os-serverlist-sync/Engines/OpenSpy"
+	"os-serverlist-sync/Engines/SAMP"
 	"os-serverlist-sync/Engines/UT2K"
 )
 
@@ -80,6 +81,8 @@ func (b *QueryEngineBlock) UnmarshalJSON(data []byte) error {
 	case "ut2k":
 		b.Params = new(UT2K.QueryEngineParams)
 		break
+	case "samp":
+		b.Params = new(SAMP.QueryEngineParams)
 	}
 
 	type tmp QueryEngineBlock // avoids infinite recursion
@@ -129,6 +132,8 @@ func (b *EngineConfiguration) UnmarshalJSON(data []byte) error {
 		b.QueryEngine = &GOA.QueryEngine{}
 	case "ut2k":
 		b.QueryEngine = &UT2K.QueryEngine{}
+	case "samp":
+		b.QueryEngine = &SAMP.QueryEngine{}
 	}
 	b.QueryEngine.SetParams(typ.QueryEngine.Params)
 

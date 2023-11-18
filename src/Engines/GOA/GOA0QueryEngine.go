@@ -10,7 +10,7 @@ import (
 )
 
 type QueryEngineParams struct {
-	SourcePort uint16
+	SourcePort uint16 `json:"source_port"`
 }
 
 type QueryEngine struct {
