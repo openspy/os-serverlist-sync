@@ -27,6 +27,7 @@ type ServerListEngine struct {
 	connection  *net.TCPConn
 	queryEngine Engine.IQueryEngine
 	params      *ServerListEngineParams
+	monitor     Engine.SyncStatusMonitor
 }
 
 func (se *ServerListEngine) SetQueryEngine(engine Engine.IQueryEngine) {
@@ -37,7 +38,10 @@ func (se *ServerListEngine) SetParams(params interface{}) {
 	se.params = params.(*ServerListEngineParams)
 }
 
-func (se *ServerListEngine) Invoke() {
+func (se *ServerListEngine) Invoke(monitor Engine.SyncStatusMonitor) {
+	se.monitor = monitor
+	monitor.BeginServerListEngine(se)
+	se.queryEngine.SetMonitor(monitor)
 
 	fmt.Println("Invoke " + se.params.ServerAddress)
 
@@ -108,7 +112,7 @@ func (se *ServerListEngine) think() {
 		serverPort := binary.BigEndian.Uint16(serverListResponse[4:])
 
 		var addr = netip.AddrPortFrom(serverIP, serverPort)
-
+		se.monitor.BeginQuery(se, se.queryEngine, addr)
 		se.queryEngine.Query(addr)
 	}
 }

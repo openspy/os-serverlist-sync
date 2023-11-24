@@ -17,6 +17,7 @@ type QueryEngine struct {
 	params        *QueryEngineParams
 	connection    *net.UDPConn
 	outputHandler Engine.IQueryOutputHandler
+	monitor       Engine.SyncStatusMonitor
 }
 
 func (qe *QueryEngine) SetParams(params interface{}) {
@@ -80,10 +81,15 @@ func (qe *QueryEngine) listen() {
 				}
 			}
 			qe.outputHandler.OnServerInfoResponse(addr, propMap)
+			qe.monitor.CompleteQuery(qe, addr.(*net.UDPAddr).AddrPort())
 		}
 	}
 }
 
 func (qe *QueryEngine) Shutdown() {
 	qe.connection.Close()
+}
+
+func (qe *QueryEngine) SetMonitor(monitor Engine.SyncStatusMonitor) {
+	qe.monitor = monitor
 }

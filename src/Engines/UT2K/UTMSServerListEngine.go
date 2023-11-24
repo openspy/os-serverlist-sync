@@ -39,6 +39,8 @@ type UTMSServerListEngine struct {
 	gotFatalError bool
 
 	challenge string
+
+	monitor Engine.SyncStatusMonitor
 }
 
 func (se *UTMSServerListEngine) SetQueryEngine(engine Engine.IQueryEngine) {
@@ -49,8 +51,10 @@ func (se *UTMSServerListEngine) SetParams(params interface{}) {
 	se.params = params.(*UTMSServerListEngineParams)
 }
 
-func (se *UTMSServerListEngine) Invoke() {
-
+func (se *UTMSServerListEngine) Invoke(monitor Engine.SyncStatusMonitor) {
+	se.monitor = monitor
+	monitor.BeginServerListEngine(se)
+	se.queryEngine.SetMonitor(monitor)
 	fmt.Println("Invoke " + se.params.ServerAddress)
 
 	servAddr := se.params.ServerAddress
@@ -152,6 +156,7 @@ func (se *UTMSServerListEngine) readListResponse() {
 		serverPort := binary.LittleEndian.Uint16(se.parser.Buffer[se.parser.CurrentOffset:])
 
 		var addr = netip.AddrPortFrom(serverIP, serverPort)
+		se.monitor.BeginQuery(se, se.queryEngine, addr)
 		se.queryEngine.Query(addr)
 	}
 }

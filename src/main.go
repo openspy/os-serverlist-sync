@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os-serverlist-sync/Config"
+	"os-serverlist-sync/Engine"
 	"time"
 )
 
@@ -13,10 +14,10 @@ const (
 	SHUTDOWN_TIME_SECS int = 120
 )
 
-func invokeMsEngines(params []Config.EngineConfiguration) {
+func invokeMsEngines(monitor Engine.SyncStatusMonitor, params []Config.EngineConfiguration) {
 
 	for _, engine := range params {
-		engine.ServerListEngine.Invoke()
+		engine.ServerListEngine.Invoke(monitor)
 	}
 }
 
@@ -38,13 +39,18 @@ func main() {
 	var params []Config.EngineConfiguration
 	json.Unmarshal(byteValue, &params)
 
-	invokeMsEngines(params)
+	var monitor Engine.SyncStatusMonitor
+	monitor.Init()
+
+	invokeMsEngines(monitor, params)
 
 	for {
-		select {
-		case <-time.After(time.Duration(SHUTDOWN_TIME_SECS) * time.Second):
-			shutdownEngines(params)
-			return
+		if monitor.AllEnginesComplete() {
+			break
 		}
+		time.Sleep(2 * time.Second)
+		monitor.Think()
 	}
+
+	shutdownEngines(params)
 }

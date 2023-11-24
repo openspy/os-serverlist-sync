@@ -31,6 +31,7 @@ type QueryEngine struct {
 	params        *QueryEngineParams
 	connection    *net.UDPConn
 	outputHandler Engine.IQueryOutputHandler
+	monitor       Engine.SyncStatusMonitor
 }
 
 func (qe *QueryEngine) SetParams(params interface{}) {
@@ -164,6 +165,7 @@ func (qe *QueryEngine) handleResponse(sourceAddress net.Addr, state *QueryParser
 	gamePortAddress.Port = gamePortAddress.Port - 1
 
 	qe.outputHandler.OnServerInfoResponse(gamePortAddress, propMap)
+	qe.monitor.CompleteQuery(qe, sourceAddress.(*net.UDPAddr).AddrPort())
 }
 
 func (qe *QueryEngine) readCompactInt(state *QueryParserState) int {
@@ -223,4 +225,8 @@ func (qe *QueryEngine) readCompactString(state *QueryParserState) string {
 
 func (qe *QueryEngine) Shutdown() {
 	qe.connection.Close()
+}
+
+func (qe *QueryEngine) SetMonitor(monitor Engine.SyncStatusMonitor) {
+	qe.monitor = monitor
 }
