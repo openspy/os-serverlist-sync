@@ -89,6 +89,9 @@ func (qe *QueryEngine) listen() {
 				continue
 			}
 
+			var udpAddr *net.UDPAddr = addr.(*net.UDPAddr)
+			propMap["hostport"] = strconv.Itoa(udpAddr.Port)
+
 			var offset = 11
 			if buf[offset] == 0 {
 				propMap["password"] = "0"
@@ -115,7 +118,7 @@ func (qe *QueryEngine) listen() {
 
 			var language_len = int(binary.LittleEndian.Uint32(buf[offset:]))
 			offset += 4
-			propMap["language"] = string(buf[offset : offset+language_len])
+			propMap["gamevariant"] = string(buf[offset : offset+language_len])
 			offset += int(language_len)
 
 			qe.outputHandler.OnServerInfoResponse(addr, propMap)
