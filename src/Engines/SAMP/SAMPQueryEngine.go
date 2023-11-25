@@ -96,6 +96,8 @@ func (qe *QueryEngine) listen() {
 			var offset = 11
 			if buf[offset] == 0 {
 				propMap["password"] = "0"
+			} else {
+				propMap["password"] = "1"
 			}
 			offset += 1
 
