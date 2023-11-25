@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"strconv"
@@ -13,7 +14,8 @@ import (
 )
 
 type OpenSpyRedisOutputHandlerParams struct {
-	Gamename string `json:"gamename"`
+	Gamename   string      `json:"gamename"`
+	InjectKeys interface{} `json:"injectKeys"`
 }
 
 const (
@@ -44,7 +46,7 @@ func (oh *OpenSpyRedisOutputHandler) OnServerInfoResponse(sourceAddress net.Addr
 		return
 	}
 
-	fmt.Printf("Num keys (%s): %d (%s) (%s)\n", *server_key, len(serverProperties), sourceAddress.String(), fmt.Sprintf("%d", udpAddr.Port))
+	log.Printf("Num keys (%s): %d (%s) (%s)\n", *server_key, len(serverProperties), sourceAddress.String(), fmt.Sprintf("%d", udpAddr.Port))
 
 	//setup standard keys
 	oh.redisClient.HSet(oh.context, *server_key, []string{
@@ -54,6 +56,12 @@ func (oh *OpenSpyRedisOutputHandler) OnServerInfoResponse(sourceAddress net.Addr
 		"gameid", fmt.Sprintf("%d", oh.gameId),
 		"injected", "1",
 	})
+
+	if oh.params.InjectKeys != nil {
+		for k, v := range oh.params.InjectKeys.(map[string]interface{}) {
+			serverProperties[k] = v.(string)
+		}
+	}
 
 	//setup custom keys
 	var custkeys_name = fmt.Sprintf("%scustkeys", *server_key)
@@ -143,7 +151,10 @@ func (oh *OpenSpyRedisOutputHandler) getServerKey(udpAddr *net.UDPAddr) *string 
 		return &server_key
 	}
 
-	result, _ := oh.redisClient.Incr(oh.context, "QRID").Result()
+	result, err := oh.redisClient.Incr(oh.context, "QRID").Result()
+	if err != nil {
+		log.Fatal(err)
+	}
 	server_key = fmt.Sprintf("%s_injected:%d:", oh.params.Gamename, result)
 
 	return &server_key

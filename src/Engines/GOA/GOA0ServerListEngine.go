@@ -8,8 +8,8 @@ import "C"
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/netip"
 	"os-serverlist-sync/Engine"
@@ -43,18 +43,20 @@ func (se *ServerListEngine) Invoke(monitor Engine.SyncStatusMonitor) {
 	monitor.BeginServerListEngine(se)
 	se.queryEngine.SetMonitor(monitor)
 
-	fmt.Println("Invoke " + se.params.ServerAddress)
+	log.Println("Invoke " + se.params.ServerAddress)
 
 	servAddr := se.params.ServerAddress
 	tcpAddr, err := net.ResolveTCPAddr("tcp", servAddr)
 	if err != nil {
 		println("ResolveTCPAddr failed:", err.Error())
+		se.monitor.EndServerListEngine(se)
 		return
 	}
 
 	conn, dialErr := net.DialTCP("tcp", nil, tcpAddr)
 	if dialErr != nil {
 		println("Dial failed:", dialErr.Error())
+		se.monitor.EndServerListEngine(se)
 		return
 	}
 	se.connection = conn
@@ -86,6 +88,7 @@ func (se *ServerListEngine) think() {
 	_, err = se.connection.Write([]byte(authQuery + listQuery))
 	if err != nil {
 		println("Failed to write GOA SB Auth Query:", err.Error())
+		se.monitor.EndServerListEngine(se)
 		return
 	}
 
@@ -97,6 +100,7 @@ func (se *ServerListEngine) think() {
 
 		if slErr != nil && !errors.Is(slErr, io.EOF) {
 			println("Failed to read GOA SB Server List Response:", slErr.Error())
+			se.monitor.EndServerListEngine(se)
 			break
 		}
 
@@ -112,8 +116,9 @@ func (se *ServerListEngine) think() {
 		serverPort := binary.BigEndian.Uint16(serverListResponse[4:])
 
 		var addr = netip.AddrPortFrom(serverIP, serverPort)
-		se.monitor.BeginQuery(se, se.queryEngine, addr)
-		se.queryEngine.Query(addr)
+		if se.monitor.BeginQuery(se, se.queryEngine, addr) {
+			se.queryEngine.Query(addr)
+		}
 	}
 }
 

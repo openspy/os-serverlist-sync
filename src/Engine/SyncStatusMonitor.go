@@ -2,6 +2,7 @@ package Engine
 
 import (
 	"container/list"
+	"log"
 	"net/netip"
 	"time"
 )
@@ -33,7 +34,7 @@ func (m *SyncStatusMonitor) BeginServerListEngine(engine IServerListEngine) {
 	m.serverEngineList.PushFront(engine)
 }
 
-func (m *SyncStatusMonitor) endServerListEngine(engine IServerListEngine) {
+func (m *SyncStatusMonitor) EndServerListEngine(engine IServerListEngine) {
 	for element := m.serverEngineList.Front(); element != nil; element = element.Next() {
 		var c IServerListEngine = element.Value.(IServerListEngine)
 		if c == engine {
@@ -50,7 +51,21 @@ func (m *SyncStatusMonitor) engineHasPendingQueries(listEngine IServerListEngine
 	}
 	return false
 }
-func (m *SyncStatusMonitor) BeginQuery(listEngine IServerListEngine, engine IQueryEngine, address netip.AddrPort) {
+func (m *SyncStatusMonitor) BeginQuery(listEngine IServerListEngine, engine IQueryEngine, address netip.AddrPort) bool {
+
+	//check for duplicate entry
+	var addr = address.Addr().As4()
+	var ip4Addr = netip.AddrFrom4(addr) //remove ipv6 portion :ffff: (which makes it different)
+
+	for element := m.queryList.Front(); element != nil; element = element.Next() {
+		var c *QueryEngineListItem = element.Value.(*QueryEngineListItem)
+		if c.engine == engine && c.address.Addr().Compare(ip4Addr) == 0 && c.address.Port() == address.Port() {
+			return false
+		}
+	}
+
+	//no duplicate... proceed
+
 	var queryItem = &QueryEngineListItem{}
 	queryItem.address = address
 	queryItem.engine = engine
@@ -59,6 +74,7 @@ func (m *SyncStatusMonitor) BeginQuery(listEngine IServerListEngine, engine IQue
 	queryItem.numAttempts = 1
 
 	m.queryList.PushFront(queryItem)
+	return true
 }
 
 func (m *SyncStatusMonitor) CompleteQuery(engine IQueryEngine, address netip.AddrPort) {
@@ -77,7 +93,7 @@ func (m *SyncStatusMonitor) CompleteQuery(engine IQueryEngine, address netip.Add
 
 	if slEngine != nil {
 		if !m.engineHasPendingQueries(slEngine) {
-			m.endServerListEngine(slEngine)
+			m.EndServerListEngine(slEngine)
 		}
 	}
 }
@@ -104,5 +120,6 @@ func (m *SyncStatusMonitor) Think() {
 	}
 	for _, c := range toComplete {
 		m.CompleteQuery(c.engine, c.address)
+		log.Printf("abandon query: %s\n", c.address.String())
 	}
 }

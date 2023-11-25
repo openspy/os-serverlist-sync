@@ -2,7 +2,7 @@ package SAMP
 
 import (
 	"encoding/binary"
-	"fmt"
+	"log"
 	"net"
 	"net/netip"
 	"os"
@@ -47,7 +47,7 @@ func (qe *QueryEngine) SetOutputHandler(handler Engine.IQueryOutputHandler) {
 
 func (qe *QueryEngine) Query(destination netip.AddrPort) {
 	var addr = net.UDPAddrFromAddrPort(destination)
-	fmt.Printf("Send query to: %s\n", addr.String())
+	log.Printf("Send query to: %s\n", addr.String())
 	writeBuffer := make([]byte, 11)
 	writeBuffer[0] = 0x53
 	writeBuffer[1] = 0x41

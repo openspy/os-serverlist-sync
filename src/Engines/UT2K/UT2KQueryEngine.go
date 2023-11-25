@@ -2,7 +2,7 @@ package UT2K
 
 import (
 	"encoding/binary"
-	"fmt"
+	"log"
 	"net"
 	"net/netip"
 	"os"
@@ -100,7 +100,7 @@ func (qe *QueryEngine) handleResponse(sourceAddress net.Addr, state *QueryParser
 	propMap := make(map[string]string)
 
 	if int(version) != qe.params.VersionID {
-		fmt.Printf("Unexpected version %d!", version)
+		log.Printf("Unexpected version %d!", version)
 		return
 	}
 
@@ -108,7 +108,7 @@ func (qe *QueryEngine) handleResponse(sourceAddress net.Addr, state *QueryParser
 	state.CurrentOffset++
 
 	if queryType != 0 {
-		fmt.Printf("Unexpected query response type!")
+		log.Printf("Unexpected query response type!")
 		return
 	}
 

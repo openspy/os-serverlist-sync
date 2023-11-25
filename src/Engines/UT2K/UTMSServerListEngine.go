@@ -4,7 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"encoding/hex"
-	"fmt"
+	"log"
 	"net"
 	"net/netip"
 	"os-serverlist-sync/Engine"
@@ -55,18 +55,20 @@ func (se *UTMSServerListEngine) Invoke(monitor Engine.SyncStatusMonitor) {
 	se.monitor = monitor
 	monitor.BeginServerListEngine(se)
 	se.queryEngine.SetMonitor(monitor)
-	fmt.Println("Invoke " + se.params.ServerAddress)
+	log.Println("Invoke " + se.params.ServerAddress)
 
 	servAddr := se.params.ServerAddress
 	tcpAddr, err := net.ResolveTCPAddr("tcp", servAddr)
 	if err != nil {
 		println("ResolveTCPAddr failed:", err.Error())
+		se.monitor.EndServerListEngine(se)
 		return
 	}
 
 	conn, dialErr := net.DialTCP("tcp", nil, tcpAddr)
 	if dialErr != nil {
 		println("Dial failed:", dialErr.Error())
+		se.monitor.EndServerListEngine(se)
 		return
 	}
 	se.connection = conn
@@ -85,21 +87,21 @@ func (se *UTMSServerListEngine) readMessage() {
 	se.readValidation()
 
 	if se.gotFatalError {
-		fmt.Printf("Got fatal error from MS, aborting")
+		log.Printf("Got fatal error from MS, aborting")
 		return
 	}
 
 	if se.params.ClientVersion >= 3000 {
 		se.readVerification()
 		if se.gotFatalError {
-			fmt.Printf("Got fatal error from MS, aborting")
+			log.Printf("Got fatal error from MS, aborting")
 			return
 		}
 	}
 
 	se.sendListRequest()
 	if se.gotFatalError {
-		fmt.Printf("Got fatal error from MS, aborting")
+		log.Printf("Got fatal error from MS, aborting")
 		return
 	}
 
@@ -156,8 +158,9 @@ func (se *UTMSServerListEngine) readListResponse() {
 		serverPort := binary.LittleEndian.Uint16(se.parser.Buffer[se.parser.CurrentOffset:])
 
 		var addr = netip.AddrPortFrom(serverIP, serverPort)
-		se.monitor.BeginQuery(se, se.queryEngine, addr)
-		se.queryEngine.Query(addr)
+		if se.monitor.BeginQuery(se, se.queryEngine, addr) {
+			se.queryEngine.Query(addr)
+		}
 	}
 }
 

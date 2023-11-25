@@ -2,7 +2,6 @@ package Engines
 
 import (
 	"bufio"
-	"fmt"
 	"log"
 	"net"
 	"net/netip"
@@ -42,7 +41,7 @@ func (se *TextFileServerListEngine) Invoke(monitor Engine.SyncStatusMonitor) {
 	scanner := bufio.NewScanner(file)
 	// optionally, resize scanner's capacity for lines over 64K, see next example
 	for scanner.Scan() {
-		fmt.Println(scanner.Text())
+		log.Println(scanner.Text())
 		var input = scanner.Text()
 		var delim = strings.Index(input, ":")
 		if delim == -1 {
@@ -55,6 +54,7 @@ func (se *TextFileServerListEngine) Invoke(monitor Engine.SyncStatusMonitor) {
 		resolvedAddr, dnsErr := net.ResolveIPAddr("ip4", host)
 		if dnsErr != nil {
 			log.Printf("failed to resolve: %s\n", host)
+			continue
 		}
 
 		port, _ := strconv.Atoi(portstr)
@@ -63,8 +63,9 @@ func (se *TextFileServerListEngine) Invoke(monitor Engine.SyncStatusMonitor) {
 
 		var addr = netip.AddrPortFrom(ipAddr, uint16(port))
 
-		monitor.BeginQuery(se, se.queryEngine, addr)
-		se.queryEngine.Query(addr)
+		if monitor.BeginQuery(se, se.queryEngine, addr) {
+			se.queryEngine.Query(addr)
+		}
 	}
 
 	if err := scanner.Err(); err != nil {

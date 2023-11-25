@@ -53,4 +53,5 @@ func main() {
 	}
 
 	shutdownEngines(params)
+	log.Printf("Exiting server list syncer\n")
 }
