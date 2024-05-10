@@ -61,10 +61,10 @@ func (qe *QueryEngine) listen() {
 			break
 		}
 
-		buf[len] = 0
+		var inputStr = string(buf[:len])
 
 		if qe.outputHandler != nil {
-			serverProps := strings.Split(string(buf), "\\")
+			serverProps := strings.Split(inputStr, "\\")
 			propMap := make(map[string]string)
 
 			var lastKey int

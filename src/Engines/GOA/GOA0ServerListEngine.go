@@ -13,14 +13,16 @@ import (
 	"net"
 	"net/netip"
 	"os-serverlist-sync/Engine"
+	"strings"
 	"unsafe"
 )
 
 type ServerListEngineParams struct {
-	ServerAddress string `json:"address"`
-	Gamename      string `json:"gamename"`
-	Secretkey     string `json:"secretkey"`
-	QueryGamename string `json:"query_gamename"`
+	ServerAddress    string `json:"address"`
+	Gamename         string `json:"gamename"`
+	Secretkey        string `json:"secretkey"`
+	QueryGamename    string `json:"query_gamename"`
+	NoCompressedList bool   `json:"no_compressed_list"`
 }
 
 type ServerListEngine struct {
@@ -84,7 +86,13 @@ func (se *ServerListEngine) think() {
 
 	var authQuery = "\\gamename\\" + se.params.Gamename + "\\validate\\" + validation_response + "\\final\\"
 
-	var listQuery = "\\list\\cmp\\gamename\\" + se.params.QueryGamename
+	var listQuery = ""
+	if se.params.NoCompressedList {
+		listQuery = "\\list\\\\gamename\\" + se.params.QueryGamename
+	} else {
+		listQuery = "\\list\\cmp\\gamename\\" + se.params.QueryGamename
+	}
+
 	_, err = se.connection.Write([]byte(authQuery + listQuery))
 	if err != nil {
 		println("Failed to write GOA SB Auth Query:", err.Error())
@@ -92,6 +100,82 @@ func (se *ServerListEngine) think() {
 		return
 	}
 
+	if se.params.NoCompressedList {
+		se.ReadUncompressedList()
+	} else {
+		se.ReadCompressedResponse()
+	}
+
+}
+
+func (se *ServerListEngine) ReadUncompressedList() {
+	//read response
+	serverListResponse := make([]byte, 25)
+
+	// 255.255.255.255:65535 - max theoretical IP - 21 bytes
+	// \ip\255.255.255.255:65535 - 25 bytes
+
+	var ipStringAccum = ""
+
+	for {
+		slLen, slErr := se.connection.Read(serverListResponse)
+
+		if slErr != nil && !errors.Is(slErr, io.EOF) {
+			println("Failed to read GOA SB Server List Response:", slErr.Error())
+			se.monitor.EndServerListEngine(se)
+			break
+		}
+
+		if slLen == 0 {
+			break
+		}
+
+		var inputStr = string(serverListResponse[:slLen])
+
+		ipStringAccum += inputStr
+
+		splitData := strings.Split(ipStringAccum, "\\ip\\")
+		for i, s := range splitData {
+
+			if i+1 != len(splitData) {
+				if len(s) > 0 {
+					se.handleIPString(s)
+				}
+
+			} else {
+				ipStringAccum = "\\ip\\" + s
+			}
+
+		}
+	}
+
+	if len(ipStringAccum) >= 4 {
+		ipStringAccum = ipStringAccum[4:]
+
+		var slashIdx = strings.Index(ipStringAccum, "\\")
+		if slashIdx != -1 {
+			ipStringAccum = ipStringAccum[:slashIdx]
+		}
+		if len(ipStringAccum) > 0 {
+			se.handleIPString(ipStringAccum)
+		}
+	}
+
+}
+
+func (se *ServerListEngine) handleIPString(inputStr string) {
+
+	addr, err := netip.ParseAddrPort(inputStr)
+	if err != nil {
+		println("GOA Failed to parse IP String:", err.Error())
+		return
+	}
+	if se.monitor.BeginQuery(se, se.queryEngine, addr) {
+		se.queryEngine.Query(addr)
+	}
+}
+
+func (se *ServerListEngine) ReadCompressedResponse() {
 	//read response
 	serverListResponse := make([]byte, 6)
 
