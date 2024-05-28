@@ -23,6 +23,7 @@ type ServerListEngineParams struct {
 	Secretkey        string `json:"secretkey"`
 	QueryGamename    string `json:"query_gamename"`
 	NoCompressedList bool   `json:"no_compressed_list"`
+	MaxChallengeLen  int    `json:"max_challenge_len"` //certain old master servers (UT) send invalid KV/data and only process up to 6 bytes anyways for the challenge
 }
 
 type ServerListEngine struct {
@@ -79,7 +80,16 @@ func (se *ServerListEngine) think() {
 		return
 	}
 
-	var challenge = string(reply)[15:]
+	var challenge string
+
+	var max_chal_len int = se.params.MaxChallengeLen
+
+	if max_chal_len != 0 {
+		challenge = string(reply)[15 : 15+max_chal_len]
+
+	} else {
+		challenge = string(reply)[15:]
+	}
 
 	//write authentication
 	var validation_response = se.gsmsalg(challenge)

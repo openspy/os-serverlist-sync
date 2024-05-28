@@ -205,12 +205,20 @@ func (se *UTMSServerListEngine) waitForData() {
 func (se *UTMSServerListEngine) readChallenge() {
 	se.waitForData()
 
+	if se.gotFatalError {
+		log.Printf("Got fatal error from MS, aborting")
+		return
+	}
+
 	se.challenge = se.readCompactString()
 	se.writeClientInfo()
 }
 
 func (se *UTMSServerListEngine) readVerification() {
 	se.waitForData()
+	if se.gotFatalError {
+		return
+	}
 
 	var verified = se.readCompactString()
 
@@ -221,6 +229,10 @@ func (se *UTMSServerListEngine) readVerification() {
 
 func (se *UTMSServerListEngine) readValidation() {
 	se.waitForData()
+	if se.gotFatalError {
+		return
+	}
+
 	var status = se.readCompactString()
 
 	if status != "APPROVED" {
