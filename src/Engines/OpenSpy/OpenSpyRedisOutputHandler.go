@@ -79,32 +79,55 @@ func (oh *OpenSpyRedisOutputHandler) OnServerInfoResponse(sourceAddress net.Addr
 
 func (oh *OpenSpyRedisOutputHandler) SetParams(params interface{}) {
 
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     os.Getenv("REDIS_SERVER"),
-		Username: os.Getenv("REDIS_USERNAME"),
-		Password: os.Getenv("REDIS_PASSWORD"),
-		DB:       0,
-		TLSConfig: &tls.Config{
-			MinVersion:         tls.VersionTLS12,
-			InsecureSkipVerify: true,
-			//Certificates: []tls.Certificate{cert}
-		},
-	})
+	redisOptions := &redis.Options{
+		Addr: os.Getenv("REDIS_SERVER"),
+	}
+
+	redisUsername := os.Getenv("REDIS_USERNAME")
+	redisPassword := os.Getenv("REDIS_PASSWORD")
+
+	if len(redisUsername) > 0 {
+		redisOptions.Username = redisUsername
+	}
+	if len(redisPassword) > 0 {
+		redisOptions.Password = redisPassword
+	}
+
+	redisUseTLS := os.Getenv("REDIS_USE_TLS")
+
+	if len(redisUseTLS) > 0 {
+		useTLSInt, _ := strconv.Atoi(redisUseTLS)
+
+		if useTLSInt == 1 {
+			tlsConfig := &tls.Config{
+				MinVersion: tls.VersionTLS12,
+				//InsecureSkipVerify: true,
+				//Certificates: []tls.Certificate{cert}
+			}
+
+			redisSkipSSLVerify := os.Getenv("REDIS_INSECURE_TLS")
+			if len(redisSkipSSLVerify) > 0 {
+				useInsecureTLS, _ := strconv.Atoi(redisSkipSSLVerify)
+
+				if useInsecureTLS == 1 {
+					tlsConfig.InsecureSkipVerify = true
+				}
+			}
+			redisOptions.TLSConfig = tlsConfig
+		}
+	}
+
+	redisOptions.DB = 0
+	rdb := redis.NewClient(redisOptions)
+
 	oh.context = context.Background()
 	oh.redisClient = rdb
 	oh.params = params.(*OpenSpyRedisOutputHandlerParams)
 
-	tempConnection := redis.NewClient(&redis.Options{
-		Addr:     os.Getenv("REDIS_SERVER"),
-		Username: os.Getenv("REDIS_USERNAME"),
-		Password: os.Getenv("REDIS_PASSWORD"),
-		DB:       2,
-		TLSConfig: &tls.Config{
-			MinVersion:         tls.VersionTLS12,
-			InsecureSkipVerify: true,
-			//Certificates: []tls.Certificate{cert}
-		},
-	})
+	redisGameLookupOptions := &redis.Options{}
+	*redisGameLookupOptions = *redisOptions
+	redisGameLookupOptions.DB = 2
+	tempConnection := redis.NewClient(redisGameLookupOptions)
 
 	defer tempConnection.Close()
 
