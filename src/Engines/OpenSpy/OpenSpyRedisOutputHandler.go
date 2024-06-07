@@ -54,6 +54,7 @@ func (oh *OpenSpyRedisOutputHandler) OnServerInfoResponse(sourceAddress net.Addr
 		"wan_port", fmt.Sprintf("%d", udpAddr.Port),
 		//there is an id property... but is it needed / used?
 		"gameid", fmt.Sprintf("%d", oh.gameId),
+		"allow_unsolicited_udp", "1",
 		"injected", "1",
 	})
 
