@@ -7,6 +7,7 @@ import (
 	"os-serverlist-sync/Engines"
 	"os-serverlist-sync/Engines/GOA"
 	"os-serverlist-sync/Engines/OpenSpy"
+	"os-serverlist-sync/Engines/QR2"
 	"os-serverlist-sync/Engines/SAMP"
 	"os-serverlist-sync/Engines/UT2K"
 )
@@ -78,6 +79,9 @@ func (b *QueryEngineBlock) UnmarshalJSON(data []byte) error {
 	case "goa0":
 		b.Params = new(GOA.QueryEngineParams)
 		break
+	case "qr2":
+		b.Params = new(QR2.QueryEngineParams)
+		break
 	case "ut2k":
 		b.Params = new(UT2K.QueryEngineParams)
 		break
@@ -130,6 +134,8 @@ func (b *EngineConfiguration) UnmarshalJSON(data []byte) error {
 	switch typ.QueryEngine.Name {
 	case "goa0":
 		b.QueryEngine = &GOA.QueryEngine{}
+	case "qr2":
+		b.QueryEngine = &QR2.QueryEngine{}
 	case "ut2k":
 		b.QueryEngine = &UT2K.QueryEngine{}
 	case "samp":

@@ -75,7 +75,7 @@ func (qe *QueryEngine) listen() {
 	for {
 		len, addr, err := qe.connection.ReadFrom(buf)
 		if err != nil {
-			println("GOA Recvfrom failed:", err.Error())
+			println("SAMP Recvfrom failed:", err.Error())
 			break
 		}
 
