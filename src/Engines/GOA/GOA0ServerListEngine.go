@@ -24,6 +24,10 @@ type ServerListEngineParams struct {
 	QueryGamename    string `json:"query_gamename"`
 	NoCompressedList bool   `json:"no_compressed_list"`
 	MaxChallengeLen  int    `json:"max_challenge_len"` //certain old master servers (UT) send invalid KV/data and only process up to 6 bytes anyways for the challenge
+	GameVer          string `json:"gamever"`
+	Location         string `json:"location"`
+	AttachQueryID    bool   `json:"attach_queryid"`
+	AttachListFinal  bool   `json:"attach_listfinal"`
 }
 
 type ServerListEngine struct {
@@ -84,23 +88,48 @@ func (se *ServerListEngine) think() {
 
 	var max_chal_len int = se.params.MaxChallengeLen
 
+	var secure_idx int = strings.Index(string(reply), "secure\\")
+
+	if secure_idx == -1 {
+		println("GOA Missing secure property")
+		return
+	}
+
 	if max_chal_len != 0 {
-		challenge = string(reply)[15 : 15+max_chal_len]
+		challenge = string(reply)[(secure_idx + 7) : (secure_idx+7)+max_chal_len]
 
 	} else {
-		challenge = string(reply)[15:]
+		challenge = string(reply)[(secure_idx + 7):]
 	}
 
 	//write authentication
 	var validation_response = se.gsmsalg(challenge)
 
-	var authQuery = "\\gamename\\" + se.params.Gamename + "\\validate\\" + validation_response + "\\final\\"
+	var authQuery = "\\gamename\\" + se.params.Gamename
+
+	if len(se.params.GameVer) > 0 {
+		authQuery += "\\gamever\\" + se.params.GameVer
+	}
+
+	if len(se.params.Location) > 0 {
+		authQuery += "\\location\\" + se.params.Location
+	}
+
+	authQuery += "\\validate\\" + validation_response + "\\final\\"
+
+	if se.params.AttachQueryID {
+		authQuery += "\\queryid\\1.1\\"
+	}
 
 	var listQuery = ""
 	if se.params.NoCompressedList {
 		listQuery = "\\list\\\\gamename\\" + se.params.QueryGamename
 	} else {
 		listQuery = "\\list\\cmp\\gamename\\" + se.params.QueryGamename
+	}
+
+	if se.params.AttachListFinal {
+		listQuery += "\\final\\"
 	}
 
 	_, err = se.connection.Write([]byte(authQuery + listQuery))
