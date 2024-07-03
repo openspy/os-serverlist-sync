@@ -74,7 +74,7 @@ func (qe *QueryEngine) listen() {
 				} else {
 					var keyName = serverProps[lastKey+1]
 					if keyName == "final" || keyName == "queryid" { //end of data stream
-						break
+						continue
 					}
 
 					propMap[keyName] = v
