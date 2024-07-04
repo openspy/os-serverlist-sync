@@ -6,6 +6,7 @@ import (
 	"os-serverlist-sync/Engine"
 	"os-serverlist-sync/Engines"
 	"os-serverlist-sync/Engines/GOA"
+	"os-serverlist-sync/Engines/GameServerListerApi"
 	"os-serverlist-sync/Engines/OpenSpy"
 	"os-serverlist-sync/Engines/QR2"
 	"os-serverlist-sync/Engines/SAMP"
@@ -58,6 +59,9 @@ func (b *MsEngineBlock) UnmarshalJSON(data []byte) error {
 		break
 	case "file":
 		b.Params = new(Engines.TextFileServerListEngineParams)
+		break
+	case "gameserverlister_api":
+		b.Params = new(GameServerListerApi.GameServerListerApiEngineParams)
 		break
 	}
 
@@ -128,6 +132,8 @@ func (b *EngineConfiguration) UnmarshalJSON(data []byte) error {
 		b.ServerListEngine = &UT2K.UTMSServerListEngine{}
 	case "file":
 		b.ServerListEngine = &Engines.TextFileServerListEngine{}
+	case "gameserverlister_api":
+		b.ServerListEngine = &GameServerListerApi.GameServerListerApiEngine{}
 	}
 	b.ServerListEngine.SetParams(typ.MsEngine.Params)
 
