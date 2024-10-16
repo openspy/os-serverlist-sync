@@ -42,7 +42,7 @@ func (qe *QueryEngine) SetParams(params interface{}) {
 	}
 	ser, err := net.ListenUDP("udp", &addr)
 	if err != nil {
-		println("QR2 QueryEngine bind failed:", err.Error())
+		log.Println("QR2 QueryEngine bind failed:", err.Error())
 		os.Exit(1)
 	}
 
@@ -91,7 +91,7 @@ func (qe *QueryEngine) listen() {
 	for {
 		bufLen, addr, err := qe.connection.ReadFrom(buf)
 		if err != nil {
-			println("QR2 Recvfrom failed:", err.Error())
+			log.Println("QR2 Recvfrom failed:", err.Error())
 			break
 		}
 

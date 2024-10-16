@@ -14,6 +14,7 @@ import (
 	"net/netip"
 	"os-serverlist-sync/Engine"
 	"strings"
+	"time"
 	"unsafe"
 )
 
@@ -52,21 +53,14 @@ func (se *ServerListEngine) Invoke(monitor Engine.SyncStatusMonitor) {
 
 	log.Println("Invoke " + se.params.ServerAddress)
 
-	servAddr := se.params.ServerAddress
-	tcpAddr, err := net.ResolveTCPAddr("tcp", servAddr)
-	if err != nil {
-		println("ResolveTCPAddr failed:", err.Error())
-		se.monitor.EndServerListEngine(se)
-		return
-	}
+	conn, dialErr := net.DialTimeout("tcp", se.params.ServerAddress, 15*time.Second)
 
-	conn, dialErr := net.DialTCP("tcp", nil, tcpAddr)
 	if dialErr != nil {
-		println("Dial failed:", dialErr.Error())
+		log.Println("Dial failed:", dialErr.Error())
 		se.monitor.EndServerListEngine(se)
 		return
 	}
-	se.connection = conn
+	se.connection = conn.(*net.TCPConn)
 
 	//wait for TCP reply, etc
 	se.think()
@@ -80,7 +74,7 @@ func (se *ServerListEngine) think() {
 
 	_, err := se.connection.Read(reply)
 	if err != nil {
-		println("Failed to read GOA SB Auth Request:", err.Error())
+		log.Println("Failed to read GOA SB Auth Request:", err.Error())
 		return
 	}
 
@@ -91,7 +85,7 @@ func (se *ServerListEngine) think() {
 	var secure_idx int = strings.Index(string(reply), "secure\\")
 
 	if secure_idx == -1 {
-		println("GOA Missing secure property")
+		log.Println("GOA Missing secure property")
 		return
 	}
 
@@ -134,7 +128,7 @@ func (se *ServerListEngine) think() {
 
 	_, err = se.connection.Write([]byte(authQuery + listQuery))
 	if err != nil {
-		println("Failed to write GOA SB Auth Query:", err.Error())
+		log.Println("Failed to write GOA SB Auth Query:", err.Error())
 		se.monitor.EndServerListEngine(se)
 		return
 	}
@@ -160,7 +154,7 @@ func (se *ServerListEngine) ReadUncompressedList() {
 		slLen, slErr := se.connection.Read(serverListResponse)
 
 		if slErr != nil && !errors.Is(slErr, io.EOF) {
-			println("Failed to read GOA SB Server List Response:", slErr.Error())
+			log.Println("Failed to read GOA SB Server List Response:", slErr.Error())
 			se.monitor.EndServerListEngine(se)
 			break
 		}
@@ -206,7 +200,7 @@ func (se *ServerListEngine) handleIPString(inputStr string) {
 
 	addr, err := netip.ParseAddrPort(inputStr)
 	if err != nil {
-		println("GOA Failed to parse IP String:", err.Error())
+		log.Println("GOA Failed to parse IP String:", err.Error())
 		return
 	}
 	if se.monitor.BeginQuery(se, se.queryEngine, addr) {
@@ -222,7 +216,7 @@ func (se *ServerListEngine) ReadCompressedResponse() {
 		slLen, slErr := se.connection.Read(serverListResponse)
 
 		if slErr != nil && !errors.Is(slErr, io.EOF) {
-			println("Failed to read GOA SB Server List Response:", slErr.Error())
+			log.Println("Failed to read GOA SB Server List Response:", slErr.Error())
 			se.monitor.EndServerListEngine(se)
 			break
 		}

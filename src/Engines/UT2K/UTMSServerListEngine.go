@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/netip"
 	"os-serverlist-sync/Engine"
+	"time"
 )
 
 type UTMSServerListEngineParams struct {
@@ -57,21 +58,14 @@ func (se *UTMSServerListEngine) Invoke(monitor Engine.SyncStatusMonitor) {
 	se.queryEngine.SetMonitor(monitor)
 	log.Println("Invoke " + se.params.ServerAddress)
 
-	servAddr := se.params.ServerAddress
-	tcpAddr, err := net.ResolveTCPAddr("tcp", servAddr)
-	if err != nil {
-		println("ResolveTCPAddr failed:", err.Error())
-		se.monitor.EndServerListEngine(se)
-		return
-	}
+	conn, dialErr := net.DialTimeout("tcp", se.params.ServerAddress, 15*time.Second)
 
-	conn, dialErr := net.DialTCP("tcp", nil, tcpAddr)
 	if dialErr != nil {
-		println("Dial failed:", dialErr.Error())
+		log.Println("Dial failed:", dialErr.Error())
 		se.monitor.EndServerListEngine(se)
 		return
 	}
-	se.connection = conn
+	se.connection = conn.(*net.TCPConn)
 
 	//wait for TCP reply, etc
 	se.think()
@@ -169,7 +163,7 @@ func (se *UTMSServerListEngine) waitForData() {
 
 	_, lenErr := se.connection.Read(lengthBuffer)
 	if lenErr != nil {
-		println("Failed to read UTMS recv length", lenErr.Error())
+		log.Println("Failed to read UTMS recv length", lenErr.Error())
 		se.gotFatalError = true
 		return
 	}
@@ -188,7 +182,7 @@ func (se *UTMSServerListEngine) waitForData() {
 		}
 
 		if incErr != nil {
-			println("Failed to read UTMS incoming buffer", incErr.Error())
+			log.Println("Failed to read UTMS incoming buffer", incErr.Error())
 			se.gotFatalError = true
 			return
 		}
@@ -329,7 +323,7 @@ func (se *UTMSServerListEngine) sendBuffer(buffer []byte) {
 
 	// _, sendLenErr := se.connection.Write(lengthBuffer)
 	// if sendLenErr != nil {
-	//     println("Failed to send length buffer:", sendLenErr.Error())
+	//     log.Println("Failed to send length buffer:", sendLenErr.Error())
 	//     return
 	// }
 
@@ -337,7 +331,7 @@ func (se *UTMSServerListEngine) sendBuffer(buffer []byte) {
 
 	_, sendErr := se.connection.Write(writeBuffer)
 	if sendErr != nil {
-		println("Failed to send buffer:", sendErr.Error())
+		log.Println("Failed to send buffer:", sendErr.Error())
 		return
 	}
 }

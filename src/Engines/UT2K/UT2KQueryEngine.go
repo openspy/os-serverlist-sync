@@ -43,7 +43,7 @@ func (qe *QueryEngine) SetParams(params interface{}) {
 	}
 	ser, err := net.ListenUDP("udp", &addr)
 	if err != nil {
-		println("UT2K QueryEngine bind failed:", err.Error())
+		log.Println("UT2K QueryEngine bind failed:", err.Error())
 		os.Exit(1)
 	}
 
@@ -76,7 +76,7 @@ func (qe *QueryEngine) listen() {
 	for {
 		len, addr, err := qe.connection.ReadFrom(buf)
 		if err != nil {
-			println("UT2K Query Recvfrom failed:", err.Error())
+			log.Println("UT2K Query Recvfrom failed:", err.Error())
 			return
 		}
 

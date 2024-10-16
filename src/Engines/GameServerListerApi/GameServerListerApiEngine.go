@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/netip"
 	"os-serverlist-sync/Engine"
+	"time"
 )
 
 type GameServerListerApiEngineParams struct {
@@ -35,7 +36,11 @@ func (se *GameServerListerApiEngine) Invoke(monitor Engine.SyncStatusMonitor) {
 	monitor.BeginServerListEngine(se)
 	se.queryEngine.SetMonitor(monitor)
 
-	res, err := http.Get(se.params.Url)
+	client := http.Client{
+		Timeout: 15 * time.Second,
+	}
+
+	res, err := client.Get(se.params.Url)
 	if err != nil {
 		fmt.Println("Got HTTP error", err)
 		return
