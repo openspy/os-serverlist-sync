@@ -200,7 +200,7 @@ func (se *ServerListEngine) handleIPString(inputStr string) {
 
 	addr, err := netip.ParseAddrPort(inputStr)
 	if err != nil {
-		log.Println("GOA Failed to parse IP String:", err.Error())
+		log.Println("GOA Failed to parse IP String:", err.Error(), "Input: ", inputStr)
 		return
 	}
 	if se.monitor.BeginQuery(se, se.queryEngine, addr) {
