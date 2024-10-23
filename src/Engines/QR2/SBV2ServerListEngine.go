@@ -54,6 +54,7 @@ type ServerListEngine struct {
 	challenge     []byte
 	enctypeXData  unsafe.Pointer
 	enctypeXReady bool
+	gotFatalError bool
 }
 
 type FieldKeyInfo struct {
@@ -81,6 +82,7 @@ func (se *ServerListEngine) Invoke(monitor Engine.SyncStatusMonitor) {
 
 	if dialErr != nil {
 		log.Println("Dial failed:", dialErr.Error())
+		se.gotFatalError = true
 		se.monitor.EndServerListEngine(se)
 		return
 	}
@@ -99,10 +101,10 @@ func (se *ServerListEngine) waitForDataOfLen(len int) []byte {
 		if remaining <= 0 {
 			break
 		}
-		len, err := se.connection.Read(dataBuffer[totalRead:remaining])
+		len, err := se.connection.Read(dataBuffer[totalRead : totalRead+remaining])
 		if err != nil {
 			log.Printf("SBV2 Read error %s\n", err.Error())
-			se.monitor.EndServerListEngine(se)
+			se.gotFatalError = true
 			break
 		}
 
@@ -142,12 +144,24 @@ func (se *ServerListEngine) enctypex_init(randomBuff []byte, keyBuf []byte) {
 
 func (se *ServerListEngine) waitForCryptHeader() {
 	var cryptRandomLenBuff = se.waitForDataOfLen(1)
+	if se.gotFatalError {
+		return
+	}
 	var cryptLen uint8 = cryptRandomLenBuff[0] ^ 0xEC
 	var cryptRandom = se.waitForDataOfLen(int(cryptLen))
+	if se.gotFatalError {
+		return
+	}
 
 	var cryptKeyLenBuff = se.waitForDataOfLen(1)
+	if se.gotFatalError {
+		return
+	}
 	var cryptKeyLen uint8 = cryptKeyLenBuff[0] ^ 0xEA
 	var cryptKey = se.waitForDataOfLen(int(cryptKeyLen))
+	if se.gotFatalError {
+		return
+	}
 
 	se.enctypex_init(cryptRandom, cryptKey)
 
@@ -183,22 +197,37 @@ func (se *ServerListEngine) readFields() []FieldKeyInfo {
 
 func (se *ServerListEngine) readListResponse() {
 	_ = se.waitForDataOfLen(4) //skip pub ipv4 info
+	if se.gotFatalError {
+		return
+	}
 
 	var portBuff = se.waitForDataOfLen(2)
+	if se.gotFatalError {
+		return
+	}
 	var defaultPort = binary.BigEndian.Uint16(portBuff)
 
 	var fields = se.readFields()
 
 	var numPopularBuff = se.waitForDataOfLen(1)
+	if se.gotFatalError {
+		return
+	}
 	if numPopularBuff[0] != 0 {
 		log.Printf("SBV2 Got unsupported popular values of size %d", numPopularBuff[0])
-		se.monitor.EndServerListEngine(se)
+		se.gotFatalError = true
 		return
 	}
 
 	for {
 		var flagsBuff = se.waitForDataOfLen(1)
+		if se.gotFatalError {
+			return
+		}
 		ipBuff := se.waitForDataOfLen(4)
+		if se.gotFatalError {
+			return
+		}
 		if ipBuff[0] == 0xff && ipBuff[1] == 0xff && ipBuff[2] == 0xff && ipBuff[3] == 0xff {
 			break
 		}
@@ -212,20 +241,33 @@ func (se *ServerListEngine) readListResponse() {
 
 		if flags&NONSTANDARD_PORT_FLAG != 0 {
 			var portBuff = se.waitForDataOfLen(2)
+			if se.gotFatalError {
+				return
+			}
 			port = binary.BigEndian.Uint16(portBuff)
 		}
 		if flags&PRIVATE_IP_FLAG != 0 {
 			_ = se.waitForDataOfLen(4)
+			if se.gotFatalError {
+				return
+			}
 			//privateIp, _ := netip.AddrFromSlice(privateIPBuff)
 			//log.Println("Private IP: ", privateIp)
 		}
 		if flags&NONSTANDARD_PRIVATE_PORT_FLAG != 0 {
 			_ = se.waitForDataOfLen(2)
+			if se.gotFatalError {
+				return
+			}
 			//_ = binary.BigEndian.Uint16(privatePortBuff)
 			//log.Println("Private port: ", priateport)
 		}
 		if flags&ICMP_IP_FLAG != 0 {
 			_ = se.waitForDataOfLen(4)
+			if se.gotFatalError {
+				return
+			}
+
 		}
 
 		//we just need to skip this data since we get it from QR2 probes
@@ -246,6 +288,9 @@ func (se *ServerListEngine) readListResponse() {
 					_ = se.waitForDataOfLen(2)
 				}
 			}
+			if se.gotFatalError {
+				return
+			}
 		}
 		if flags&HAS_FULL_RULES_FLAG != 0 {
 			for {
@@ -255,6 +300,13 @@ func (se *ServerListEngine) readListResponse() {
 				}
 				se.ReadNTS() //value
 			}
+			if se.gotFatalError {
+				return
+			}
+		}
+
+		if se.gotFatalError {
+			return
 		}
 
 		var serverAddr netip.AddrPort = netip.AddrPortFrom(publicIp, port)
@@ -320,8 +372,16 @@ func (se *ServerListEngine) writeListRequest() {
 	}
 
 	se.waitForCryptHeader()
+	if se.gotFatalError {
+		se.monitor.EndServerListEngine(se)
+		return
+	}
 
 	se.readListResponse()
+	if se.gotFatalError {
+		se.monitor.EndServerListEngine(se)
+		return
+	}
 
 }
 
