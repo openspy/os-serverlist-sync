@@ -164,7 +164,9 @@ func (qe *QueryEngine) handleResponse(sourceAddress net.Addr, state *QueryParser
 	var gamePortAddress = sourceAddress.(*net.UDPAddr)
 	gamePortAddress.Port = gamePortAddress.Port - 1
 
-	qe.outputHandler.OnServerInfoResponse(gamePortAddress, propMap)
+	if qe.outputHandler != nil {
+		qe.outputHandler.OnServerInfoResponse(gamePortAddress, propMap)
+	}
 	qe.monitor.CompleteQuery(qe, sourceAddress.(*net.UDPAddr).AddrPort())
 }
 

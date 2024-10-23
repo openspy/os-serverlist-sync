@@ -80,7 +80,9 @@ func (qe *QueryEngine) listen() {
 					propMap[keyName] = v
 				}
 			}
-			qe.outputHandler.OnServerInfoResponse(addr, propMap)
+			if qe.outputHandler != nil {
+				qe.outputHandler.OnServerInfoResponse(addr, propMap)
+			}
 			qe.monitor.CompleteQuery(qe, addr.(*net.UDPAddr).AddrPort())
 		}
 	}

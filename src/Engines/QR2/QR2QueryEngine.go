@@ -120,8 +120,8 @@ func (qe *QueryEngine) listen() {
 
 		if qe.outputHandler != nil {
 			qe.outputHandler.OnServerInfoResponse(addr, propMap)
-			qe.monitor.CompleteQuery(qe, udpAddr.AddrPort())
 		}
+		qe.monitor.CompleteQuery(qe, udpAddr.AddrPort())
 	}
 }
 

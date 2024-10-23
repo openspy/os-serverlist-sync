@@ -54,6 +54,9 @@ func (b *MsEngineBlock) UnmarshalJSON(data []byte) error {
 	case "goa0":
 		b.Params = new(GOA.ServerListEngineParams)
 		break
+	case "sbv2":
+		b.Params = new(QR2.ServerListEngineParams)
+		break
 	case "ut2k":
 		b.Params = new(UT2K.UTMSServerListEngineParams)
 		break
@@ -128,6 +131,8 @@ func (b *EngineConfiguration) UnmarshalJSON(data []byte) error {
 	switch typ.MsEngine.Name {
 	case "goa0":
 		b.ServerListEngine = &GOA.ServerListEngine{}
+	case "sbv2":
+		b.ServerListEngine = &QR2.ServerListEngine{}
 	case "ut2k":
 		b.ServerListEngine = &UT2K.UTMSServerListEngine{}
 	case "file":
