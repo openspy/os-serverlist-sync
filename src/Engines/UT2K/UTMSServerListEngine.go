@@ -1,6 +1,7 @@
 package UT2K
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/binary"
 	"encoding/hex"
@@ -42,6 +43,9 @@ type UTMSServerListEngine struct {
 	challenge string
 
 	monitor Engine.SyncStatusMonitor
+
+	ctx       context.Context
+	ctxCancel context.CancelCauseFunc
 }
 
 func (se *UTMSServerListEngine) SetQueryEngine(engine Engine.IQueryEngine) {
@@ -52,23 +56,43 @@ func (se *UTMSServerListEngine) SetParams(params interface{}) {
 	se.params = params.(*UTMSServerListEngineParams)
 }
 
-func (se *UTMSServerListEngine) Invoke(monitor Engine.SyncStatusMonitor) {
+func (se *UTMSServerListEngine) Invoke(monitor Engine.SyncStatusMonitor, parentCtx context.Context) {
+	ctx, cancel := context.WithCancelCause(parentCtx)
+	se.ctx = ctx
+	se.ctxCancel = cancel
+
 	se.monitor = monitor
 	monitor.BeginServerListEngine(se)
 	se.queryEngine.SetMonitor(monitor)
-	log.Println("Invoke " + se.params.ServerAddress)
 
-	conn, dialErr := net.DialTimeout("tcp", se.params.ServerAddress, 15*time.Second)
+	go func() {
+		log.Println("Invoke " + se.params.ServerAddress)
 
-	if dialErr != nil {
-		log.Println("Dial failed:", dialErr.Error())
-		se.monitor.EndServerListEngine(se)
-		return
-	}
-	se.connection = conn.(*net.TCPConn)
+		conn, dialErr := net.DialTimeout("tcp", se.params.ServerAddress, 15*time.Second)
 
-	//wait for TCP reply, etc
-	se.think()
+		if dialErr != nil {
+			log.Println("Dial failed:", dialErr.Error())
+			se.monitor.EndServerListEngine(se)
+			se.ctxCancel(dialErr)
+			return
+		}
+		se.connection = conn.(*net.TCPConn)
+
+		//wait for TCP reply, etc
+		se.think()
+
+		se.ctxCancel(nil)
+
+	}()
+
+	go func() {
+		select {
+		case <-se.ctx.Done():
+			se.monitor.EndServerListEngine(se)
+			se.Shutdown()
+			return
+		}
+	}()
 }
 
 func (se *UTMSServerListEngine) think() {
@@ -165,6 +189,7 @@ func (se *UTMSServerListEngine) waitForData() {
 	if lenErr != nil {
 		log.Println("Failed to read UTMS recv length", lenErr.Error())
 		se.gotFatalError = true
+		se.ctxCancel(lenErr)
 		return
 	}
 	length := binary.LittleEndian.Uint32(lengthBuffer)
@@ -184,6 +209,7 @@ func (se *UTMSServerListEngine) waitForData() {
 		if incErr != nil {
 			log.Println("Failed to read UTMS incoming buffer", incErr.Error())
 			se.gotFatalError = true
+			se.ctxCancel(incErr)
 			return
 		}
 
@@ -332,6 +358,7 @@ func (se *UTMSServerListEngine) sendBuffer(buffer []byte) {
 	_, sendErr := se.connection.Write(writeBuffer)
 	if sendErr != nil {
 		log.Println("Failed to send buffer:", sendErr.Error())
+		se.ctxCancel(sendErr)
 		return
 	}
 }

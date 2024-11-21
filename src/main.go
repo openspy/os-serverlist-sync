@@ -1,8 +1,9 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"os-serverlist-sync/Config"
@@ -10,31 +11,30 @@ import (
 	"time"
 )
 
-const (
-	SHUTDOWN_TIME_SECS int = 120
-)
-
-func invokeMsEngines(monitor Engine.SyncStatusMonitor, params []Config.EngineConfiguration) {
+func invokeMsEngines(monitor Engine.SyncStatusMonitor, params []Config.EngineConfiguration, ctx context.Context) {
 
 	for _, engine := range params {
-		engine.ServerListEngine.Invoke(monitor)
+		engine.ServerListEngine.Invoke(monitor, ctx)
 	}
 }
 
 func shutdownEngines(params []Config.EngineConfiguration) {
 	for _, engine := range params {
 		engine.ServerListEngine.Shutdown()
+		engine.QueryEngine.Shutdown()
 	}
 }
 
 func main() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	defer cancel()
 	file, err := os.Open("ms_config.json")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer file.Close()
 
-	byteValue, _ := ioutil.ReadAll(file)
+	byteValue, _ := io.ReadAll(file)
 
 	var params []Config.EngineConfiguration
 	json.Unmarshal(byteValue, &params)
@@ -42,14 +42,25 @@ func main() {
 	var monitor Engine.SyncStatusMonitor
 	monitor.Init()
 
-	invokeMsEngines(monitor, params)
+	ticker := time.NewTicker(2 * time.Second)
 
-	for {
-		if monitor.AllEnginesComplete() {
-			break
+	go func() {
+		for _ = range ticker.C {
+			monitor.Think()
+			if monitor.AllEnginesComplete() {
+				cancel()
+				break
+			}
 		}
-		time.Sleep(2 * time.Second)
-		monitor.Think()
+	}()
+
+	invokeMsEngines(monitor, params, ctx)
+
+	select {
+	case <-ctx.Done():
+		log.Println("Shutdown event", ctx.Err())
+		ticker.Stop()
+		break
 	}
 
 	shutdownEngines(params)

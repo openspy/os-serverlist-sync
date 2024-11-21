@@ -6,7 +6,9 @@ package QR2
 import "C"
 
 import (
+	"context"
 	"encoding/binary"
+	"errors"
 	"log"
 	"net"
 	"net/netip"
@@ -55,6 +57,9 @@ type ServerListEngine struct {
 	enctypeXData  unsafe.Pointer
 	enctypeXReady bool
 	gotFatalError bool
+
+	ctx       context.Context
+	ctxCancel context.CancelCauseFunc
 }
 
 type FieldKeyInfo struct {
@@ -70,26 +75,45 @@ func (se *ServerListEngine) SetParams(params interface{}) {
 	se.params = params.(*ServerListEngineParams)
 }
 
-func (se *ServerListEngine) Invoke(monitor Engine.SyncStatusMonitor) {
+func (se *ServerListEngine) Invoke(monitor Engine.SyncStatusMonitor, parentCtx context.Context) {
+	ctx, cancel := context.WithCancelCause(parentCtx)
+	se.ctx = ctx
+	se.ctxCancel = cancel
+
 	se.monitor = monitor
 	se.enctypeXReady = false
 	monitor.BeginServerListEngine(se)
 	se.queryEngine.SetMonitor(monitor)
 
-	log.Println("Invoke " + se.params.ServerAddress)
+	go func() {
+		log.Println("Invoke " + se.params.ServerAddress)
 
-	conn, dialErr := net.DialTimeout("tcp", se.params.ServerAddress, 15*time.Second)
+		conn, dialErr := net.DialTimeout("tcp", se.params.ServerAddress, 15*time.Second)
 
-	if dialErr != nil {
-		log.Println("Dial failed:", dialErr.Error())
-		se.gotFatalError = true
-		se.monitor.EndServerListEngine(se)
-		return
-	}
-	se.connection = conn.(*net.TCPConn)
+		if dialErr != nil {
+			log.Println("Dial failed:", dialErr.Error())
+			se.gotFatalError = true
+			se.monitor.EndServerListEngine(se)
+			se.ctxCancel(dialErr)
+			return
+		}
+		se.connection = conn.(*net.TCPConn)
 
-	//wait for TCP reply, etc
-	se.think()
+		//wait for TCP reply, etc
+		se.think()
+
+		se.ctxCancel(nil)
+	}()
+
+	go func() {
+		select {
+		case <-se.ctx.Done():
+			se.monitor.EndServerListEngine(se)
+			se.Shutdown()
+			return
+		}
+	}()
+
 }
 
 func (se *ServerListEngine) waitForDataOfLen(len int) []byte {
@@ -105,6 +129,7 @@ func (se *ServerListEngine) waitForDataOfLen(len int) []byte {
 		if err != nil {
 			log.Printf("SBV2 Read error %s\n", err.Error())
 			se.gotFatalError = true
+			se.ctxCancel(err)
 			break
 		}
 
@@ -215,6 +240,7 @@ func (se *ServerListEngine) readListResponse() {
 	}
 	if numPopularBuff[0] != 0 {
 		log.Printf("SBV2 Got unsupported popular values of size %d", numPopularBuff[0])
+		se.ctxCancel(errors.New("SBV2 Got unsupported popular values"))
 		se.gotFatalError = true
 		return
 	}
@@ -368,6 +394,7 @@ func (se *ServerListEngine) writeListRequest() {
 	if err != nil {
 		log.Println("Failed to write SBV2 Auth Query:", err.Error())
 		se.monitor.EndServerListEngine(se)
+		se.ctxCancel(err)
 		return
 	}
 
@@ -398,6 +425,7 @@ func (se *ServerListEngine) Shutdown() {
 		se.connection.Close()
 	}
 	if se.enctypeXReady {
+		se.enctypeXReady = false
 		C.free(se.enctypeXData)
 	}
 }

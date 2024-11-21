@@ -6,6 +6,7 @@ package GOA
 import "C"
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -36,6 +37,9 @@ type ServerListEngine struct {
 	queryEngine Engine.IQueryEngine
 	params      *ServerListEngineParams
 	monitor     Engine.SyncStatusMonitor
+
+	ctx       context.Context
+	ctxCancel context.CancelCauseFunc
 }
 
 func (se *ServerListEngine) SetQueryEngine(engine Engine.IQueryEngine) {
@@ -46,24 +50,44 @@ func (se *ServerListEngine) SetParams(params interface{}) {
 	se.params = params.(*ServerListEngineParams)
 }
 
-func (se *ServerListEngine) Invoke(monitor Engine.SyncStatusMonitor) {
+func (se *ServerListEngine) Invoke(monitor Engine.SyncStatusMonitor, parentCtx context.Context) {
+
+	ctx, cancel := context.WithCancelCause(parentCtx)
+	se.ctx = ctx
+	se.ctxCancel = cancel
+
 	se.monitor = monitor
 	monitor.BeginServerListEngine(se)
 	se.queryEngine.SetMonitor(monitor)
 
-	log.Println("Invoke " + se.params.ServerAddress)
+	go func() {
+		log.Println("Invoke " + se.params.ServerAddress)
 
-	conn, dialErr := net.DialTimeout("tcp", se.params.ServerAddress, 15*time.Second)
+		conn, dialErr := net.DialTimeout("tcp", se.params.ServerAddress, 15*time.Second)
 
-	if dialErr != nil {
-		log.Println("Dial failed:", dialErr.Error())
-		se.monitor.EndServerListEngine(se)
-		return
-	}
-	se.connection = conn.(*net.TCPConn)
+		if dialErr != nil {
+			log.Println("Dial failed:", dialErr.Error())
+			cancel(dialErr)
+			se.monitor.EndServerListEngine(se)
+			return
+		}
+		se.connection = conn.(*net.TCPConn)
 
-	//wait for TCP reply, etc
-	se.think()
+		//wait for TCP reply, etc
+		se.think()
+
+		cancel(nil)
+	}()
+
+	go func() {
+		select {
+		case <-se.ctx.Done():
+			se.monitor.EndServerListEngine(se)
+			se.Shutdown()
+			return
+		}
+	}()
+
 }
 
 func (se *ServerListEngine) think() {
@@ -75,6 +99,7 @@ func (se *ServerListEngine) think() {
 	_, err := se.connection.Read(reply)
 	if err != nil {
 		log.Println("Failed to read GOA SB Auth Request:", err.Error())
+		se.ctxCancel(err)
 		return
 	}
 
@@ -129,7 +154,7 @@ func (se *ServerListEngine) think() {
 	_, err = se.connection.Write([]byte(authQuery + listQuery))
 	if err != nil {
 		log.Println("Failed to write GOA SB Auth Query:", err.Error())
-		se.monitor.EndServerListEngine(se)
+		se.ctxCancel(err)
 		return
 	}
 
@@ -138,6 +163,8 @@ func (se *ServerListEngine) think() {
 	} else {
 		se.ReadCompressedResponse()
 	}
+
+	se.ctxCancel(nil)
 
 }
 
@@ -155,7 +182,7 @@ func (se *ServerListEngine) ReadUncompressedList() {
 
 		if slErr != nil && !errors.Is(slErr, io.EOF) {
 			log.Println("Failed to read GOA SB Server List Response:", slErr.Error())
-			se.monitor.EndServerListEngine(se)
+			se.ctxCancel(slErr)
 			break
 		}
 
