@@ -53,19 +53,16 @@ func (b *MsEngineBlock) UnmarshalJSON(data []byte) error {
 	switch typ.Name {
 	case "goa0":
 		b.Params = new(GOA.ServerListEngineParams)
-		break
 	case "sbv2":
 		b.Params = new(QR2.ServerListEngineParams)
-		break
 	case "ut2k":
 		b.Params = new(UT2K.UTMSServerListEngineParams)
-		break
 	case "file":
 		b.Params = new(Engines.TextFileServerListEngineParams)
-		break
 	case "gameserverlister_api":
 		b.Params = new(GameServerListerApi.GameServerListerApiEngineParams)
-		break
+	case "openmp_api":
+		b.Params = new(SAMP.OpenMpApiEngineParams)
 	}
 
 	type tmp MsEngineBlock // avoids infinite recursion
@@ -85,13 +82,10 @@ func (b *QueryEngineBlock) UnmarshalJSON(data []byte) error {
 	switch typ.Name {
 	case "goa0":
 		b.Params = new(GOA.QueryEngineParams)
-		break
 	case "qr2":
 		b.Params = new(QR2.QueryEngineParams)
-		break
 	case "ut2k":
 		b.Params = new(UT2K.QueryEngineParams)
-		break
 	case "samp":
 		b.Params = new(SAMP.QueryEngineParams)
 	}
@@ -139,6 +133,8 @@ func (b *EngineConfiguration) UnmarshalJSON(data []byte) error {
 		b.ServerListEngine = &Engines.TextFileServerListEngine{}
 	case "gameserverlister_api":
 		b.ServerListEngine = &GameServerListerApi.GameServerListerApiEngine{}
+	case "openmp_api":
+		b.ServerListEngine = &SAMP.OpenMpApiEngine{}
 	}
 	b.ServerListEngine.SetParams(typ.MsEngine.Params)
 
