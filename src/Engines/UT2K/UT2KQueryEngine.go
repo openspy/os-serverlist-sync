@@ -100,7 +100,7 @@ func (qe *QueryEngine) handleResponse(sourceAddress net.Addr, state *QueryParser
 	propMap := make(map[string]string)
 
 	if int(version) != qe.params.VersionID {
-		log.Printf("Unexpected version %d!", version)
+		log.Printf("[%s] Unexpected version %d!\n", sourceAddress.String(), version)
 		return
 	}
 
@@ -108,7 +108,7 @@ func (qe *QueryEngine) handleResponse(sourceAddress net.Addr, state *QueryParser
 	state.CurrentOffset++
 
 	if queryType != 0 {
-		log.Printf("Unexpected query response type!")
+		log.Printf("[%s] Unexpected query response type!\n", sourceAddress.String())
 		return
 	}
 
