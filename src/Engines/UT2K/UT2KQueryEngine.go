@@ -197,7 +197,7 @@ func (qe *QueryEngine) readCompactInt(state *QueryParserState) int {
 	}
 	length = (length << 6) + int((B[0] & 0x3f))
 	if (B[0] & 0x80) != 0 {
-		length = -length
+		length = length * 2
 	}
 	return length
 }

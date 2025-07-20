@@ -137,18 +137,32 @@ func (oh *OpenSpyRedisInputHandler) Invoke(monitor Engine.SyncStatusMonitor, par
 			}
 
 			var wanip = gameResults[0].(string)
-			var wanport = gameResults[1].(string)
+			var wanport_str = gameResults[1].(string)
 			var injected = gameResults[2].(string)
+
+			wanport, wanport_err := strconv.Atoi(wanport_str)
+
+			if wanport_err != nil {
+				continue
+			}
 
 			if injected != "1" {
 				continue
 			}
 
+			//lame hack due to the way ut2004 data is stored / in gamespy (gameport is the wanport, queryport is +1)
+			if oh.params.Gamename == "ut2004" || oh.params.Gamename == "ut2003" {
+				wanport = wanport + 1
+			}
+
+			wanport_str = strconv.Itoa(wanport)
+
 			var addrPort netip.AddrPort
-			addrPort, addrErr := netip.ParseAddrPort(wanip + ":" + wanport)
+			addrPort, addrErr := netip.ParseAddrPort(wanip + ":" + string(wanport_str))
 			if addrErr != nil {
 				continue
 			}
+
 			if monitor.BeginQuery(oh, oh.queryEngine, addrPort) {
 				oh.queryEngine.Query(addrPort)
 			}
