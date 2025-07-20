@@ -112,11 +112,13 @@ func (oh *OpenSpyRedisInputHandler) Invoke(monitor Engine.SyncStatusMonitor, par
 	monitor.BeginServerListEngine(oh)
 	oh.queryEngine.SetMonitor(monitor)
 
+	var itemsToDelete []string
+
 	var cursor uint64 = 0
 	var keys []string
 	var err error
 	for {
-		var scanCmd = oh.redisClient.ZScan(oh.ctx, oh.params.Gamename, cursor, "*", 1)
+		var scanCmd = oh.redisClient.ZScan(oh.ctx, oh.params.Gamename, cursor, "*", 50)
 		keys, cursor, err = scanCmd.Result()
 		if err != nil {
 			break
@@ -130,6 +132,7 @@ func (oh *OpenSpyRedisInputHandler) Invoke(monitor Engine.SyncStatusMonitor, par
 			}
 
 			if gameResults[0] == nil || gameResults[1] == nil || gameResults[2] == nil {
+				itemsToDelete = append(itemsToDelete, key)
 				continue
 			}
 
@@ -154,6 +157,10 @@ func (oh *OpenSpyRedisInputHandler) Invoke(monitor Engine.SyncStatusMonitor, par
 			break
 		}
 	}
+	if len(itemsToDelete) > 0 {
+		oh.redisClient.ZRem(oh.ctx, oh.params.Gamename, itemsToDelete)
+	}
+
 	oh.ctxCancel(nil)
 
 	go func() {

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"io"
 	"log"
 	"os"
@@ -45,7 +46,12 @@ func applyRefreshModeInputEngine(params []Config.EngineConfiguration) []Config.E
 func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 	defer cancel()
-	file, err := os.Open("ms_config.json")
+
+	refreshMode := flag.Bool("refresh-only", false, "Only refresh existing injected servers")
+	configPath := flag.String("config", "ms_config.json", "Path to config file")
+	flag.Parse()
+
+	file, err := os.Open(*configPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -56,13 +62,7 @@ func main() {
 	var params []Config.EngineConfiguration
 	json.Unmarshal(byteValue, &params)
 
-	//check if refresh mode, if so - replace input handlers
-	var refreshMode = false
-	args := os.Args
-	if len(args) > 1 {
-		refreshMode = args[1] == "--refresh-only" //this mode will only refresh existing injected servers, without querying msEngines
-	}
-	if refreshMode {
+	if *refreshMode {
 		params = applyRefreshModeInputEngine(params)
 	}
 	//
