@@ -184,3 +184,6 @@ func (oh *OpenSpyRedisOutputHandler) getServerKey(udpAddr *net.UDPAddr) *string 
 	return &server_key
 
 }
+func (oh *OpenSpyRedisOutputHandler) GetGamename() string {
+	return oh.params.Gamename
+}
